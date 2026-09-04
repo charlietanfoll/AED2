@@ -1,0 +1,13 @@
+﻿# C / C++
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+build/
+bin/
+.cache/
+compile_commands.json
