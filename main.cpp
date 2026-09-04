@@ -1,8 +1,10 @@
-#include <print>
-#include <vector>
-#include <ranges>
+#include <fstream>
+#include <iostream>
+
+
+using namespace std;
 
 int main() {
-    std::println("Projeto C++23 pronto no Zed!");
-    return 0;
+  cout << "Start Inicial!" << endl;
+  return 0;
 }
