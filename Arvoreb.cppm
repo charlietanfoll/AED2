@@ -7,14 +7,14 @@ using namespace std;
 
 
 struct node {
-  
+
 };
 
 class btree {
 public:
   // A priori, retorna true se achou, e false se não. (ainda nn li
   // os slides do prof, então talvez depois precisaremos mudar
-  //  pra retornar uma struct, se nn me entano) att. charlie
+  //  pra retornar uma struct, se nn me engano) att. charlie
   bool msearch() {
     return true;
   };
