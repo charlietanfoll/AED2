@@ -7,7 +7,9 @@ using namespace std;
 
 const int KEYS_COUNT = 50;
 
-struct node {};
+struct node {
+
+};
 
 class btree {
 public:
