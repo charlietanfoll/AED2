@@ -5,4 +5,5 @@ set(CMAKE_CXX_STANDARD 14)
 
 add_executable(AED2
         Arvoreb.cppm
-        main.cpp)
+        main.cpp
+)
