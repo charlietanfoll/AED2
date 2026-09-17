@@ -65,8 +65,8 @@ public:
   }
 
   //Charlie Maracutaias por aqui
-  vector<unique_ptr<registro>> msearch() {
-    vector<unique_ptr<registro>> caminho;
+  vector<registro> msearch() {
+    vector<registro> caminho;
     return caminho;
   };
 
