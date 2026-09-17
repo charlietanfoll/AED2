@@ -19,6 +19,14 @@ struct head {
 
 struct node {
   int id;
+
+  bool folha;
+  char titulo[100];
+  char autor[100];
+  int ano_publicacao;
+  char editora[80];
+  char isbn[20];
+
   vector<int> chaves; // Numero de Nós -1
   vector<int> nos; //K vias?
 };
