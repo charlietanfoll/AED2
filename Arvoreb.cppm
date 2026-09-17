@@ -18,7 +18,8 @@ struct head {
 };
 // Ainda estou editando o registro, estava faltando coisas
 struct registro {
-  int total;
+  int id;
+  int chaves_escritas;
   vector<int> chaves; // Numero de Nós -1
   vector<int> nos; //K vias?
 };
