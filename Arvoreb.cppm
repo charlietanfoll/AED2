@@ -81,7 +81,7 @@ private:
     // Calcula o tamanho dos registros em tempo de execução (Requisito Opt 2)
     //                     header + Chaves e nos + inteiros
     registro_size = (sizeof(head) + (sizeof(head.quantidade_de_vias) * 2) + 7);
-  }
+  };
 
   int head_size = sizeof(struct::head);
   int registro_size;
