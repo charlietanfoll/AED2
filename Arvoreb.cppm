@@ -16,17 +16,9 @@ struct head {
   int lixeira = -1;
   int root = -1;
 };
-
-struct node {
-  int id;
-
-  bool folha;
-  char titulo[100];
-  char autor[100];
-  int ano_publicacao;
-  char editora[80];
-  char isbn[20];
-
+// Ainda estou editando o registro, estava faltando coisas
+struct registro {
+  int total;
   vector<int> chaves; // Numero de Nós -1
   vector<int> nos; //K vias?
 };
@@ -72,8 +64,8 @@ public:
   }
 
   //Charlie Maracutaias por aqui
-  vector<unique_ptr<node>> msearch() {
-    vector<unique_ptr<node>> caminho;
+  vector<unique_ptr<registro>> msearch() {
+    vector<unique_ptr<registro>> caminho;
     return caminho;
   };
 
@@ -81,12 +73,6 @@ public:
   void deleteb() {};
 
 private:
-  //Charlie Edita esta função agr!
-  unique_ptr<node> popular_node(int id) {
-    unique_ptr<node> new_node = make_unique<node>();
-    file.read(reinterpret_cast<char *>(&new_node), head_size + id);
-  };
-
   //Gerenciar os espaços apagados por aqui. Dps vou implementar.
   void reaproveitar() {};
   int head_size = sizeof(struct::head);
