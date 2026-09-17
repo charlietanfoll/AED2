@@ -78,9 +78,9 @@ private:
   void reaproveitar() {};
 
   void calcular_node_size() {
-    //          2 ints          + quantidade de chaves e IDs exatos.
-    registro_size = sizeof(int) * 2 + sizeof(int) * head.quantidade_de_vias * 2 - 1;
-  };
+    // Calcula o tamanho dos registros em tempo de execução (Requisito Opt 2)
+    registro_size = (sizeof(int) * (2 * head.quantidade_de_vias + 1));
+  }
 
   int head_size = sizeof(struct::head);
   int registro_size;
