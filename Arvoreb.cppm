@@ -76,8 +76,14 @@ public:
 private:
   //Gerenciar os espaços apagados por aqui. Dps vou implementar.
   void reaproveitar() {};
+
+  void calcular_node_size() {
+    //          2 ints          + quantidade de chaves e IDs exatos.
+    registro_size = sizeof(int) * 2 + sizeof(int) * head.quantidade_de_vias * 2 - 1;
+  };
+
   int head_size = sizeof(struct::head);
-  int node_size;
+  int registro_size;
   head head;
   fstream file;
 };
