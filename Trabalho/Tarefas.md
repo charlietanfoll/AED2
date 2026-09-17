@@ -3,7 +3,7 @@
 ## Requisitos Obrigatórios
 
 ### 1. Estrutura e Paradigma
-- [ ] Implementar obrigatoriamente usando **classes em C++** (Tipos Abstratos de Dados).
+- [x] Implementar obrigatoriamente usando **classes em C++** (Tipos Abstratos de Dados).
 - [ ] A árvore deve residir em **memória secundária (disco)**.
 - [ ] A raiz **não** deve ser variável global e deve ser persistente entre execuções.
 
@@ -21,9 +21,9 @@
 - [ ] **Documentação:** Cada método deve ter comentários com parâmetros, funcionalidades, pré e pós-condições.
 
 ### 3. Gerenciamento de Disco (Eficiência)
-- [ ] Manter o arquivo aberto durante as operações (evitar abrir/fechar a cada nó).
+- [x] Manter o arquivo aberto durante as operações (evitar abrir/fechar a cada nó).
 - [ ] Leitura e escrita de nós devem ser feitas em **um único comando para a struct inteira** (tamanho fixo).
-- [ ] A **ordem da árvore (m)** deve estar em um cabeçalho separado, não dentro de cada nó.
+- [x] A **ordem da árvore (m)** deve estar em um cabeçalho separado, não dentro de cada nó.
 
 ### 4. Interface de Uso
 - [ ] Menu interativo em loop.
