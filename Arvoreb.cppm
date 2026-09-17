@@ -79,7 +79,8 @@ private:
 
   void calcular_node_size() {
     // Calcula o tamanho dos registros em tempo de execução (Requisito Opt 2)
-    registro_size = (sizeof(int) * (2 * head.quantidade_de_vias + 1));
+    //                     header + Chaves e nos + inteiros
+    registro_size = (sizeof(head) + (sizeof(head.quantidade_de_vias) * 2) + 7);
   }
 
   int head_size = sizeof(struct::head);
