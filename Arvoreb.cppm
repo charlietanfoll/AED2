@@ -69,16 +69,16 @@ public:
     return caminho;
   };
 
-
   void insertb() {};
   void deleteb() {};
 
 private:
+  //Charlie Edita esta função agr!
   unique_ptr<node> popular_node(int id) {
     unique_ptr<node> new_node = make_unique<node>();
-
-    file.read(reinterpret_cast<char *>(&new_node), 5);
+    file.read(reinterpret_cast<char *>(&new_node), head_size + id);
   };
+
   //Gerenciar os espaços apagados por aqui. Dps vou implementar.
   void reaproveitar() {};
   int head_size = sizeof(struct::head);
