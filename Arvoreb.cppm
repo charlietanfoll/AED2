@@ -81,6 +81,7 @@ private:
   };
   //Gerenciar os espaços apagados por aqui. Dps vou implementar.
   void reaproveitar() {};
+  int head_size = sizeof(struct::head);
   head head;
   fstream file;
 };
