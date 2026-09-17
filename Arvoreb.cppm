@@ -11,12 +11,12 @@ using namespace std;
 struct head {
   int version = -1;
   int quantidade_de_vias = -1;
+  int ultimo_id = -1;
   int lixeira = -1;
   int root = -1;
 };
 
-class node {
-public:
+struct node {
   node(int size): chaves(size - 1), nos(size) {};
   int id;
   vector<int> chaves; // Numero de Nós -1
