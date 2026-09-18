@@ -23,6 +23,12 @@ struct node {
   vector<int> dados; //indice do registro que vai estar no arquivo de dados.
 };
 
+struct resultadoDaBusca {
+  int id;
+  int quantidadeDeVias;
+  vector<unique_ptr<node>> caminho;
+};
+
 class btree {
 public:
   //Abre uma árvore já existente.
@@ -63,9 +69,9 @@ public:
   };
 
   //Charlie Maracutaias por aqui
-  static vector<unique_ptr<node>> mSearch() {
-    vector<unique_ptr<node>> caminho;
-    return caminho;
+  static resultadoDaBusca mSearch(int id) {
+    resultadoDaBusca resultado;
+    return resultado;
   };
 
   void insertb() {};
