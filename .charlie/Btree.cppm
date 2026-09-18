@@ -36,8 +36,8 @@ public:
         file->seekg(posicao);
         file->read(reinterpret_cast<char*>(nos.data()), sizeof(nos));
     };
-private:
 
+    //Atributos
     int chavesTotais = 0;
     vector<int> chaves;
     vector<int> nos;
