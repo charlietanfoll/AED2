@@ -10,22 +10,18 @@
 using namespace std;
 
 struct head {
-  int version = -1;
-  int quantidade_de_vias = -1;
-  int maior_id = -1;
-  int lixeira = -1;
-  int root = -1;
+  int root = -1;              // Indice do nó raiz atual.
+  int quantidadeDeVias = -1;  //Ordem M, com K vias =M. E K - 1 chaves.
+  int lixeira = -1;           //Índice da Pilha de registros apagados.
 };
 // Ainda estou editando o registro, estava faltando coisas
-struct registro {
-  int id;
-  int chaves_escritas;
-  vector<int> chaves; // Numero de Nós -1
-  vector<int> nos; //K vias?
+struct node {
+  int chavesEscritas;
+  bool isFolha;
+  vector<int> chaves; // K - 1 nos
+  vector<int> nos; //K vias
+  vector<int> dados; //indice do registro que vai estar no arquivo de dados.
 };
-
-
-
 
 class btree {
 public:
@@ -42,7 +38,7 @@ public:
   };
 
   //Cria uma nova árvore e um novo arquivo.
-  void nova_tree(string alias, int vias) {
+  void novaTree(string alias, int vias) {
     //Verifica se não existe um arquivo com mesmo nome e o criar;
     if (file.is_open()) {
       cout << "A btree já existe! Crie outra instância" << endl;
@@ -53,20 +49,22 @@ public:
       exit(1);
     } else {
       file.open(alias, ios::out | ios::in | ios::binary);
-      head.quantidade_de_vias = vias;
+      head.quantidadeDeVias = vias;
     }
   };
 
   //Destrutor que escreve o cabeçalho atualizado ao fechar o programa no disco.
   ~btree() {
     // Escreve o novo cabeçalho no arquivo antes de limpar a memória!
-    file.write(reinterpret_cast<char *>(&head), sizeof(head));
-    file.close();
-  }
+    if (file.is_open()) {
+      file.write(reinterpret_cast<char *>(&head), sizeof(head));
+      file.close();
+    }
+  };
 
   //Charlie Maracutaias por aqui
-  vector<registro> msearch() {
-    vector<registro> caminho;
+  static vector<unique_ptr<node>> mSearch() {
+    vector<unique_ptr<node>> caminho;
     return caminho;
   };
 
@@ -77,14 +75,14 @@ private:
   //Gerenciar os espaços apagados por aqui. Dps vou implementar.
   void reaproveitar() {};
 
-  void calcular_node_size() {
-    // Calcula o tamanho dos registros em tempo de execução (Requisito Opt 2)
-    //                     header + Chaves e nos + inteiros
-    registro_size = (sizeof(head) + (sizeof(head.quantidade_de_vias) * 2) + 7);
+  void calcularNodeSize() {
+    // Calcula o tamanho dos nodes em tempo de execução (Requisito Opt 2)
+    //                     header + nodes e chaves + inteiros
+    registroSize = (sizeof(head) + (sizeof(head.quantidadeDeVias) * 2) + 7);
   };
 
-  int head_size = sizeof(struct::head);
-  int registro_size;
+  int headSize = sizeof(struct::head);
+  int registroSize;
   head head;
   fstream file;
 };
