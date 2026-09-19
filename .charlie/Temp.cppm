@@ -5,7 +5,6 @@
 #include <vector>
 #include <string>
 #include <filesystem>
-#include <memory>
 #include <span>
 
 using namespace std;
@@ -32,8 +31,6 @@ public:
         chaves = span<int>(buffer.data() + 1, ordem - 1);
         nos = span<int>(buffer.data() + ordem ,ordem);
     };
-
-    void Salvar() {};
 
     //Atributos
     int& chavesTotais() { return buffer[0];}
