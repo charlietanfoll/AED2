@@ -14,8 +14,7 @@ using namespace std;
 class Node;
 class Btree;
 struct header;
-struct caminho;
-struct resultadoDaBusca;
+struct caminhoDaBusca;
 
 struct header {
     int root;
@@ -23,16 +22,9 @@ struct header {
     int pilhaDaLixeira;
 };
 
-struct caminho {
-    vector<int> indicesAcessados;
-    vector<unique_ptr<Node>> nosAcessados;
-};
-
-struct resultadoDaBusca {
-    bool encontrado;
-    int  indiceNo;
-    int  posicao;     // posicao da chave dentro do no (encontrada OU de insercao)
-    caminho resultado;
+struct caminhoDaBusca {
+    vector<int> posicoesInternas;
+    vector<unique_ptr<Node>> nodesAcessados;
 };
 
 class Node {
@@ -52,12 +44,15 @@ public:
         nos = span<int>(buffer.data() + ordem ,ordem);
     };
 
-    //Atributos
+    //Atributos Fisicos
     int& chavesTotais() { return buffer[0];}
     const int& chavesTotais() const { return buffer[0];}
     vector<int> buffer;
     span<int> chaves;
     span<int> nos;
+
+    //Atributos Temporários
+    int chaveInterna;
 };
 
 class Btree {
@@ -88,7 +83,59 @@ public:
     }
 
 private:
-    resultadoDaBusca msearch();
+    // A Arvore precisa estar instanciada e
+    // o solicitador pronto para tratar a estrutura.
+    optional<caminhoDaBusca> msearch(int elemento) {
+        if (header.root == -1) {
+            return nullopt; // Arvore vazia
+        }
+
+        caminhoDaBusca caminho;
+        int rrnAtual = header.root;
+
+        while (rrnAtual != -1) {
+            auto noAtual = make_unique<Node>(rrnAtual, header.ordem, &file);
+
+            int inicio = 0;
+            int fim = noAtual->chavesTotais() - 1;
+            int indice = 0;
+            bool encontrou = false;
+
+            // Busca binaria dentro do node atual
+            while (inicio <= fim) {
+                int meio = inicio + (fim - inicio) / 2;
+
+                if (noAtual->chaves[meio] == elemento) {
+                    indice = meio;
+                    encontrou = true;
+                    break;
+                } else if (elemento < noAtual->chaves[meio]) {
+                    fim = meio - 1;
+                } else {
+                    inicio = meio + 1;
+                }
+            }
+
+            if (encontrou) {
+                caminho.posicoesInternas.push_back(indice);
+                caminho.nodesAcessados.push_back(std::move(noAtual));
+                return caminho;
+            }
+
+            // Se chegou aqui, 'inicio' é exatamente o índice do filho em 'nos'
+            indice = inicio;
+            int proximoRrn = noAtual->nos[indice];
+
+            caminho.posicoesInternas.push_back(indice);
+            caminho.nodesAcessados.push_back(std::move(noAtual));
+
+            rrnAtual = proximoRrn;
+        }
+
+        return nullopt; // Chave não encontrada
+    }
+
+    //Atributos da Btree
     header header;
     fstream file;
 };
