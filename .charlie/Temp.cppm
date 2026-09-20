@@ -8,8 +8,10 @@
 #include <span>
 #include <memory>
 #include <optional>
+#include <utility>
 
 using namespace std;
+using namespace std::utilities;
 
 class Node;
 class Btree;
@@ -72,17 +74,6 @@ public:
         }
     }
 
-    bool insertB();
-
-    bool deleteB();
-
-    ~Btree() {
-        file.seekp(0);
-        file.write(reinterpret_cast<char *>(&header), sizeof(header));
-        file.close();
-    }
-
-private:
     // A Arvore precisa estar instanciada e
     // o solicitador pronto para tratar a estrutura.
     optional<caminhoDaBusca> msearch(int elemento) {
@@ -118,7 +109,7 @@ private:
 
             if (encontrou) {
                 caminho.posicoesInternas.push_back(indice);
-                caminho.nodesAcessados.push_back(std::move(noAtual));
+                caminho.nodesAcessados.push_back(move(noAtual));
                 return caminho;
             }
 
@@ -127,13 +118,25 @@ private:
             int proximoRrn = noAtual->nos[indice];
 
             caminho.posicoesInternas.push_back(indice);
-            caminho.nodesAcessados.push_back(std::move(noAtual));
+            caminho.nodesAcessados.push_back(move(noAtual));
 
             rrnAtual = proximoRrn;
         }
 
         return nullopt; // Chave não encontrada
     }
+
+    bool insertB();
+
+    bool deleteB();
+
+    ~Btree() {
+        file.seekp(0);
+        file.write(reinterpret_cast<char *>(&header), sizeof(header));
+        file.close();
+    }
+
+private:
 
     //Atributos da Btree
     header header;
