@@ -6,13 +6,34 @@
 #include <string>
 #include <filesystem>
 #include <span>
+#include <memory>
 
 using namespace std;
+
+class Node;
+class Btree;
+struct header;
+struct caminho;
+struct resultadoDaBusca;
 
 struct header {
     int root;
     int ordem; // ordem = M e chaves = M-1
     int pilhaDaLixeira;
+};
+
+
+
+struct caminho {
+    vector<int> indicesAcessados;
+    vector<unique_ptr<Node>> nosAcessados;
+};
+
+struct resultadoDaBusca {
+    bool encontrado;
+    int  indiceNo;
+    int  posicao;     // posicao da chave dentro do no (encontrada OU de insercao)
+    caminho resultado;
 };
 
 class Node {
@@ -43,6 +64,9 @@ public:
 class Btree {
 public:
 
+
 private:
+    header header;
+    fstream file;
 
 };
