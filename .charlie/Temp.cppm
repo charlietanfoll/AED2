@@ -11,12 +11,14 @@
 #include <utility>
 
 using namespace std;
-using namespace std::utilities;
 
 class Node;
 class Btree;
 struct header;
 struct caminhoDaBusca;
+
+//Um dia vai ser implementado!
+struct data;
 
 struct header {
     int root;
@@ -126,7 +128,63 @@ public:
         return nullopt; // Chave não encontrada
     }
 
-    bool insertB();
+    bool insertB(int chave) {
+        // CASO 1: A árvore está completamente vazia
+        if (header.root == -1) {
+            int novoId = obterNovoId();
+
+            // O obterNovoId já cuidou de atualizar o header.pilhaDaLixeira no disco
+            // caso tenha reaproveitado um ID.
+
+            Node raiz(novoId, header.ordem, &file);
+
+            raiz.chavesTotais() = 1;
+            raiz.chaves[0] = chave;
+
+            for (int i = 0; i < header.ordem; i++) {
+                raiz.nos[i] = -1;
+            }
+            for (int i = 1; i < header.ordem - 1; i++) {
+                raiz.chaves[i] = 0;
+            }
+
+            salvarNoNoDisco(novoId, &raiz);
+
+            // Atualiza o root para o ID encontrado/reaproveitado
+            header.root = novoId;
+            file.seekp(0);
+            file.write(reinterpret_cast<char*>(&header), sizeof(header));
+
+            return true;
+        }
+
+        // CASO 2: A árvore já tem elementos
+        int idAtual = header.root;
+        Node noAtual(idAtual, header.ordem, &file);
+
+        while (noAtual.nos[0] != -1) {
+            int indice = encontrarIndiceFilho(&noAtual, chave);
+            idAtual = noAtual.nos[indice];
+            noAtual = Node(idAtual, header.ordem, &file);
+        }
+
+        if (noAtual.chavesTotais() < header.ordem - 1) {
+            int i = noAtual.chavesTotais() - 1;
+
+            while (i >= 0 && noAtual.chaves[i] > chave) {
+                noAtual.chaves[i + 1] = noAtual.chaves[i];
+                i--;
+            }
+
+            noAtual.chaves[i + 1] = chave;
+            noAtual.chavesTotais()++;
+
+            salvarNoNoDisco(idAtual, &noAtual);
+            return true;
+        }
+
+        return false;
+    }
 
     bool deleteB();
 
@@ -141,4 +199,51 @@ private:
     //Atributos da Btree
     header header;
     fstream file;
+
+    //Funcoes Auxiliares
+
+    // Função auxiliar para calcular a posição e salvar o nó no disco
+    void salvarNoNoDisco(int id, Node* no) {
+        int posicao = sizeof(header) + (id * header.ordem * 2 * sizeof(int));
+        file.seekp(posicao);
+        file.write(reinterpret_cast<char*>(no->buffer.data()), no->buffer.size() * sizeof(int));
+    }
+
+    // Função que gerencia de onde virá o espaço para o novo nó
+    int obterNovoId() {
+        // Verifica se existe alguma posição na lixeira para ser reaproveitada
+        if (header.pilhaDaLixeira != -1) {
+            int rrnReutilizado = header.pilhaDaLixeira;
+
+            // Calcula a posição no disco onde o nó deletado está
+            int posicao = sizeof(header) + (rrnReutilizado * header.ordem * 2 * sizeof(int));
+            file.seekg(posicao);
+
+            // Lê o primeiro inteiro desse bloco. Em um nó deletado,
+            // este valor guarda o RRN do PRÓXIMO elemento na pilha da lixeira.
+            int proximoLixo;
+            file.read(reinterpret_cast<char*>(&proximoLixo), sizeof(int));
+
+            // Atualiza o header fazendo a lixeira apontar para o próximo espaço livre (pop)
+            header.pilhaDaLixeira = proximoLixo;
+
+            // Salva a alteração do header imediatamente no disco
+            file.seekp(0);
+            file.write(reinterpret_cast<char*>(&header), sizeof(header));
+
+            return rrnReutilizado; // Retorna o ID reaproveitado
+        }
+
+        // Se a lixeira estiver vazia (-1), alocamos no final do arquivo
+        file.seekg(0, ios::end);
+        int tamanhoArquivo = file.tellg();
+
+        // Se o arquivo só tem o header, o primeiro nó é o ID 0
+        if (tamanhoArquivo == sizeof(header)) {
+            return 0;
+        }
+
+        // Calcula a nova posição no final do arquivo
+        return (tamanhoArquivo - sizeof(header)) / (header.ordem * 2 * sizeof(int));
+    }
 };
