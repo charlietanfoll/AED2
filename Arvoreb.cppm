@@ -5,90 +5,562 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <span>
 #include <memory>
+#include <utility>
 
 using namespace std;
 
-struct head {
-  int root = -1;              // Indice do nó raiz atual.
-  int quantidadeDeVias = -1;  //Ordem M, com K vias =M. E K - 1 chaves.
-  int lixeira = -1;           //Índice da Pilha de registros apagados.
-};
-// Ainda estou editando o registro, estava faltando coisas
-struct node {
-  int chavesEscritas;
-  bool isFolha;
-  vector<int> chaves; // K - 1 nos
-  vector<int> nos; //K vias
-  vector<int> dados; //indice do registro que vai estar no arquivo de dados.
+class Node;
+class Btree;
+
+struct header {
+    int root;           // RRN da raiz (-1 se vazia)
+    int ordem;          // Grau M da árvore (M vias, M-1 chaves)
+    int pilhaDaLixeira; // Topo da pilha de nós excluídos
 };
 
-struct resultadoDaBusca {
-  int id;
-  int quantidadeDeVias;
-  vector<unique_ptr<node>> caminho;
+struct caminhoDaBusca {
+    bool encontrado = false;                 // Indica se a chave foi encontrada
+    vector<int> posicoesInternas;            // Índices internos no nó durante o percurso
+    vector<unique_ptr<Node>> nodesAcessados; // Pilha de nós visitados da raiz até a parada
 };
 
-class btree {
+class Node {
 public:
-  //Abre uma árvore já existente.
-  btree(string alias): file(alias, ios::in | ios::out | ios::binary) {
-    if (file.is_open()) {
-      //Se o arquivo Abrir, popula o head com as informações da btree.
-      file.read(reinterpret_cast<char *>(&head), sizeof(head));
-      cout << "Arquivo aberto com sucesso!" << endl;
-    } else {
-      cout << "Arquivo não pode ser aberto!" << endl;
-      exit(1);
-    }
-  };
+    // Carrega um nó existente do disco a partir do RRN
+    Node(int rrn, int ordem, fstream * file) : rrn(rrn) {
+        int tamanho = ordem * 2;
+        buffer.resize(tamanho);
 
-  //Cria uma nova árvore e um novo arquivo.
-  void novaTree(string alias, int vias) {
-    //Verifica se não existe um arquivo com mesmo nome e o criar;
-    if (file.is_open()) {
-      cout << "A btree já existe! Crie outra instância" << endl;
-      exit(1);
-    }
-    if (std::filesystem::exists(alias)) {
-      cout << "Nome de arquivo já usado!" << endl;
-      exit(1);
-    } else {
-      file.open(alias, ios::out | ios::in | ios::binary);
-      head.quantidadeDeVias = vias;
-    }
-  };
+        int posicao = sizeof(header) + (rrn * (ordem * 2 * sizeof(int)));
+        file->clear();
+        file->seekg(posicao);
+        file->read(reinterpret_cast<char *>(buffer.data()), buffer.size() * sizeof(int));
 
-  //Destrutor que escreve o cabeçalho atualizado ao fechar o programa no disco.
-  ~btree() {
-    // Escreve o novo cabeçalho no arquivo antes de limpar a memória!
-    if (file.is_open()) {
-      file.write(reinterpret_cast<char *>(&head), sizeof(head));
-      file.close();
+        chaves = span<int>(buffer.data() + 1, ordem - 1);
+        nos = span<int>(buffer.data() + ordem, ordem);
     }
-  };
 
-  //Charlie Maracutaias por aqui
-  static resultadoDaBusca mSearch(int id) {
-    resultadoDaBusca resultado;
-    return resultado;
-  };
+    // Inicializa um nó novo em memória (evita ler dados inexistentes do disco)
+    Node(int rrn, int ordem) : rrn(rrn) {
+        int tamanho = ordem * 2;
+        buffer.assign(tamanho, -1);
+        buffer[0] = 0; // Quantidade de chaves iniciais
+        for (int i = 1; i < ordem; ++i) {
+            buffer[i] = 0;
+        }
+        chaves = span<int>(buffer.data() + 1, ordem - 1);
+        nos = span<int>(buffer.data() + ordem, ordem);
+    }
 
-  void insertb() {};
-  void deleteb() {};
+    int& chavesTotais() { return buffer[0]; }
+    const int& chavesTotais() const { return buffer[0]; }
+
+    int rrn;
+    vector<int> buffer;
+    span<int> chaves;
+    span<int> nos;
+};
+
+class Btree {
+public:
+    Btree(string alias, int ordem = 10) {
+        if (!filesystem::exists(alias)) {
+            file.open(alias, ios::out | ios::in | ios::binary | ios::trunc);
+            header.root = -1;
+            header.ordem = ordem;
+            header.pilhaDaLixeira = -1;
+            file.write(reinterpret_cast<char *>(&header), sizeof(header));
+            file.flush();
+        } else {
+            file.open(alias, ios::out | ios::in | ios::binary);
+            file.read(reinterpret_cast<char *>(&header), sizeof(header));
+        }
+    }
+
+    ~Btree() {
+        if (file.is_open()) {
+            file.seekp(0);
+            file.write(reinterpret_cast<char *>(&header), sizeof(header));
+            file.flush();
+            file.close();
+        }
+    }
+
+    /**
+     * @brief Realiza a busca iterativa de uma chave na Árvore B.
+     * @param elemento Chave inteira a ser pesquisada.
+     * @return caminhoDaBusca Estrutura contendo flag de sucesso e a pilha de nós acessados.
+     * @pre Arquivo da árvore aberto e válido.
+     * @post Retorna o caminho da raiz até o nó onde a busca terminou sem alterar o disco.
+     */
+    caminhoDaBusca mSearch(int elemento) {
+        caminhoDaBusca caminho;
+        caminho.encontrado = false;
+
+        if (header.root == -1) {
+            return caminho;
+        }
+
+        int rrnAtual = header.root;
+
+        while (rrnAtual != -1) {
+            auto noAtual = make_unique<Node>(rrnAtual, header.ordem, &file);
+
+            int inicio = 0;
+            int fim = noAtual->chavesTotais() - 1;
+            int indice = 0;
+            bool achouNoNode = false;
+
+            // Busca binária dentro do nó
+            while (inicio <= fim) {
+                int meio = inicio + (fim - inicio) / 2;
+
+                if (noAtual->chaves[meio] == elemento) {
+                    indice = meio;
+                    achouNoNode = true;
+                    break;
+                } else if (elemento < noAtual->chaves[meio]) {
+                    fim = meio - 1;
+                } else {
+                    inicio = meio + 1;
+                }
+            }
+
+            if (achouNoNode) {
+                caminho.encontrado = true;
+                caminho.posicoesInternas.push_back(indice);
+                caminho.nodesAcessados.push_back(move(noAtual));
+                return caminho;
+            }
+
+            indice = inicio;
+            int proximoRrn = noAtual->nos[indice];
+
+            caminho.posicoesInternas.push_back(indice);
+            caminho.nodesAcessados.push_back(move(noAtual));
+
+            rrnAtual = proximoRrn;
+        }
+
+        return caminho;
+    }
+
+    /**
+     * @brief Insere uma chave iterativamente na Árvore B com split e overflow.
+     * @param chave Inteiro a ser inserido.
+     * @return true se inserido com sucesso; false se chave duplicada.
+     * @pre Arquivo da árvore aberto e válido.
+     * @post Chave persistida mantendo balanceamento e propriedades da Árvore B.
+     */
+    bool insertB(int chave) {
+        // Caso 1: Árvore vazia
+        if (header.root == -1) {
+            int novoId = obterNovoId();
+            Node raiz(novoId, header.ordem);
+
+            raiz.chavesTotais() = 1;
+            raiz.chaves[0] = chave;
+
+            salvarNoNoDisco(novoId, &raiz);
+
+            header.root = novoId;
+            file.seekp(0);
+            file.write(reinterpret_cast<char*>(&header), sizeof(header));
+            file.flush();
+            return true;
+        }
+
+        // Caso 2: Chamada obrigatória ao mSearch
+        caminhoDaBusca busca = mSearch(chave);
+        if (busca.encontrado) {
+            return false;
+        }
+
+        int chavePromovida = chave;
+        int filhoDireito = -1;
+        bool propagar = true;
+
+        // Caso 3: Desempilha nós da folha até a raiz
+        while (propagar && !busca.nodesAcessados.empty()) {
+            auto noAtual = move(busca.nodesAcessados.back());
+            busca.nodesAcessados.pop_back();
+            int rrnAtual = noAtual->rrn;
+
+            // Sem overflow: cabe no nó atual
+            if (noAtual->chavesTotais() < header.ordem - 1) {
+                int i = noAtual->chavesTotais() - 1;
+                while (i >= 0 && noAtual->chaves[i] > chavePromovida) {
+                    noAtual->chaves[i + 1] = noAtual->chaves[i];
+                    noAtual->nos[i + 2] = noAtual->nos[i + 1];
+                    i--;
+                }
+                noAtual->chaves[i + 1] = chavePromovida;
+                noAtual->nos[i + 2] = filhoDireito;
+                noAtual->chavesTotais()++;
+
+                salvarNoNoDisco(rrnAtual, noAtual.get());
+                propagar = false;
+                break;
+            }
+
+            // COM OVERFLOW: Nó cheio -> SPLIT (Cisão)
+            vector<int> tempChaves(header.ordem);
+            vector<int> tempNos(header.ordem + 1);
+
+            tempNos[0] = noAtual->nos[0];
+            int pos = 0;
+            while (pos < noAtual->chavesTotais() && noAtual->chaves[pos] < chavePromovida) {
+                tempChaves[pos] = noAtual->chaves[pos];
+                tempNos[pos + 1] = noAtual->nos[pos + 1];
+                pos++;
+            }
+            tempChaves[pos] = chavePromovida;
+            tempNos[pos + 1] = filhoDireito;
+            for (int k = pos; k < noAtual->chavesTotais(); ++k) {
+                tempChaves[k + 1] = noAtual->chaves[k];
+                tempNos[k + 2] = noAtual->nos[k + 1];
+            }
+
+            int meio = header.ordem / 2;
+            chavePromovida = tempChaves[meio];
+
+            // Atualiza nó esquerdo (reaproveita noAtual)
+            noAtual->chavesTotais() = meio;
+            noAtual->nos[0] = tempNos[0];
+            for (int k = 0; k < meio; ++k) {
+                noAtual->chaves[k] = tempChaves[k];
+                noAtual->nos[k + 1] = tempNos[k + 1];
+            }
+            for (int k = meio; k < header.ordem - 1; ++k) noAtual->chaves[k] = 0;
+            for (int k = meio + 1; k < header.ordem; ++k) noAtual->nos[k] = -1;
+            salvarNoNoDisco(rrnAtual, noAtual.get());
+
+            // Cria nó direito
+            int novoRrn = obterNovoId();
+            Node novoNo(novoRrn, header.ordem);
+
+            int qtdDireita = (header.ordem - 1) - meio;
+            novoNo.chavesTotais() = qtdDireita;
+            novoNo.nos[0] = tempNos[meio + 1];
+            for (int k = 0; k < qtdDireita; ++k) {
+                novoNo.chaves[k] = tempChaves[meio + 1 + k];
+                novoNo.nos[k + 1] = tempNos[meio + 1 + k + 1];
+            }
+            salvarNoNoDisco(novoRrn, &novoNo);
+
+            filhoDireito = novoRrn;
+        }
+
+        // Caso 4: Split atingiu a raiz -> Nova raiz
+        if (propagar) {
+            int novaRaizRrn = obterNovoId();
+            Node novaRaiz(novaRaizRrn, header.ordem);
+
+            novaRaiz.chavesTotais() = 1;
+            novaRaiz.chaves[0] = chavePromovida;
+            novaRaiz.nos[0] = header.root;
+            novaRaiz.nos[1] = filhoDireito;
+
+            salvarNoNoDisco(novaRaizRrn, &novaRaiz);
+
+            header.root = novaRaizRrn;
+            file.seekp(0);
+            file.write(reinterpret_cast<char*>(&header), sizeof(header));
+            file.flush();
+        }
+
+        return true;
+    }
+
+    /**
+     * @brief Remove uma chave da Árvore B de forma iterativa com redistribuição e fusão.
+     * @param chave Inteiro a ser removido.
+     * @return true se a chave foi encontrada e removida; false se a chave não existe.
+     * @pre Arquivo da árvore aberto e válido.
+     * @post Chave removida mantendo as propriedades da Árvore B (mínimo de chaves por nó),
+     *       e nós descartados são movidos para a pilha da lixeira em disco.
+     */
+    bool deleteB(int chave) {
+        if (header.root == -1) {
+            return false;
+        }
+
+        // 1. Busca obrigatória via mSearch
+        caminhoDaBusca busca = mSearch(chave);
+        if (!busca.encontrado) {
+            return false; // Chave inexistente
+        }
+
+        int idxChave = busca.posicoesInternas.back();
+        auto noAlvo = busca.nodesAcessados.back().get();
+
+        // 2. Se a chave está em NÓ INTERNO (tem filhos): troca pelo sucessor imediato
+        if (noAlvo->nos[0] != -1) {
+            // Desce para a subárvore direita (via nos[idxChave + 1])
+            int rrnDescida = noAlvo->nos[idxChave + 1];
+            busca.posicoesInternas.push_back(idxChave + 1);
+
+            // Caminha sempre pelo filho mais à esquerda até atingir uma folha
+            while (rrnDescida != -1) {
+                auto noDescida = make_unique<Node>(rrnDescida, header.ordem, &file);
+                int proximo = noDescida->nos[0];
+                busca.posicoesInternas.push_back(0);
+                busca.nodesAcessados.push_back(move(noDescida));
+                rrnDescida = proximo;
+            }
+
+            // O topo da pilha agora é a folha que contém o sucessor
+            auto noFolha = busca.nodesAcessados.back().get();
+            int chaveSucessora = noFolha->chaves[0];
+
+            // Substitui a chave no nó interno pelo sucessor e grava no disco
+            noAlvo->chaves[idxChave] = chaveSucessora;
+            salvarNoNoDisco(noAlvo->rrn, noAlvo);
+
+            // A remoção física agora ocorrerá na primeira chave da folha
+            idxChave = 0;
+        }
+
+        // 3. Remoção física da chave na folha (topo da pilha)
+        auto noFolha = busca.nodesAcessados.back().get();
+        for (int i = idxChave; i < noFolha->chavesTotais() - 1; ++i) {
+            noFolha->chaves[i] = noFolha->chaves[i + 1];
+        }
+        noFolha->chavesTotais()--;
+        salvarNoNoDisco(noFolha->rrn, noFolha);
+
+        // 4. Rebalanceamento de Underflow (subindo iterativamente pela pilha)
+        int minChaves = (header.ordem - 1) / 2;
+
+        while (!busca.nodesAcessados.empty()) {
+            auto noAtual = move(busca.nodesAcessados.back());
+            busca.nodesAcessados.pop_back();
+            busca.posicoesInternas.pop_back();
+
+            // CASO RAIZ
+            if (noAtual->rrn == header.root) {
+                if (noAtual->chavesTotais() == 0) {
+                    if (noAtual->nos[0] != -1) {
+                        // A raiz esvaziou mas tem filho: o filho se torna a nova raiz
+                        header.root = noAtual->nos[0];
+                    } else {
+                        // Árvore esvaziou completamente
+                        header.root = -1;
+                    }
+                    moverParaLixeira(noAtual->rrn);
+                    file.seekp(0);
+                    file.write(reinterpret_cast<char*>(&header), sizeof(header));
+                    file.flush();
+                }
+                break; // Raiz tratada, fim do rebalanceamento
+            }
+
+            // Se o nó possui o mínimo de chaves, não há underflow
+            if (noAtual->chavesTotais() >= minChaves) {
+                break;
+            }
+
+            // UNDERFLOW: Necessita rebalanceamento com o pai
+            if (busca.nodesAcessados.empty()) {
+                break;
+            }
+
+            auto noPai = busca.nodesAcessados.back().get();
+
+            // Localiza a posição de noAtual dentro do pai
+            int posNoPai = -1;
+            for (int i = 0; i <= noPai->chavesTotais(); ++i) {
+                if (noPai->nos[i] == noAtual->rrn) {
+                    posNoPai = i;
+                    break;
+                }
+            }
+            if (posNoPai == -1) break;
+
+            // TENTATIVA 1: Empréstimo do Irmão Esquerdo
+            if (posNoPai > 0) {
+                int rrnEsq = noPai->nos[posNoPai - 1];
+                Node irmaoEsq(rrnEsq, header.ordem, &file);
+
+                if (irmaoEsq.chavesTotais() > minChaves) {
+                    // Abre espaço na primeira posição do nó atual
+                    for (int i = noAtual->chavesTotais(); i > 0; --i) {
+                        noAtual->chaves[i] = noAtual->chaves[i - 1];
+                    }
+                    for (int i = noAtual->chavesTotais() + 1; i > 0; --i) {
+                        noAtual->nos[i] = noAtual->nos[i - 1];
+                    }
+
+                    // Chave separadora do pai desce para a primeira posição
+                    noAtual->chaves[0] = noPai->chaves[posNoPai - 1];
+                    // Último filho do irmão esquerdo passa para o nó atual
+                    noAtual->nos[0] = irmaoEsq.nos[irmaoEsq.chavesTotais()];
+
+                    // Maior chave do irmão esquerdo sobe para o pai
+                    noPai->chaves[posNoPai - 1] = irmaoEsq.chaves[irmaoEsq.chavesTotais() - 1];
+
+                    noAtual->chavesTotais()++;
+                    irmaoEsq.chavesTotais()--;
+
+                    salvarNoNoDisco(noAtual->rrn, noAtual.get());
+                    salvarNoNoDisco(irmaoEsq.rrn, &irmaoEsq);
+                    salvarNoNoDisco(noPai->rrn, noPai);
+                    break; // Rebalanceamento concluído
+                }
+            }
+
+            // TENTATIVA 2: Empréstimo do Irmão Direito
+            if (posNoPai < noPai->chavesTotais()) {
+                int rrnDir = noPai->nos[posNoPai + 1];
+                Node irmaoDir(rrnDir, header.ordem, &file);
+
+                if (irmaoDir.chavesTotais() > minChaves) {
+                    // Chave separadora do pai desce para a última posição
+                    noAtual->chaves[noAtual->chavesTotais()] = noPai->chaves[posNoPai];
+                    // Primeiro filho do irmão direito passa para o nó atual
+                    noAtual->nos[noAtual->chavesTotais() + 1] = irmaoDir.nos[0];
+
+                    // Menor chave do irmão direito sobe para o pai
+                    noPai->chaves[posNoPai] = irmaoDir.chaves[0];
+
+                    // Desloca elementos do irmão direito para a esquerda
+                    for (int i = 0; i < irmaoDir.chavesTotais() - 1; ++i) {
+                        irmaoDir.chaves[i] = irmaoDir.chaves[i + 1];
+                    }
+                    for (int i = 0; i < irmaoDir.chavesTotais(); ++i) {
+                        irmaoDir.nos[i] = irmaoDir.nos[i + 1];
+                    }
+
+                    noAtual->chavesTotais()++;
+                    irmaoDir.chavesTotais()--;
+
+                    salvarNoNoDisco(noAtual->rrn, noAtual.get());
+                    salvarNoNoDisco(irmaoDir.rrn, &irmaoDir);
+                    salvarNoNoDisco(noPai->rrn, noPai);
+                    break; // Rebalanceamento concluído
+                }
+            }
+
+            // TENTATIVA 3: Fusão (Concatenação / Merge)
+            // Se nenhum irmão pode emprestar, junta dois nós com minChaves + chave do pai
+            if (posNoPai > 0) {
+                // Fusão de noAtual dentro do irmão esquerdo
+                int rrnEsq = noPai->nos[posNoPai - 1];
+                Node irmaoEsq(rrnEsq, header.ordem, &file);
+
+                // Chave separadora do pai desce
+                irmaoEsq.chaves[irmaoEsq.chavesTotais()] = noPai->chaves[posNoPai - 1];
+                irmaoEsq.chavesTotais()++;
+
+                // Copia chaves e ponteiros de noAtual para irmaoEsq
+                for (int i = 0; i < noAtual->chavesTotais(); ++i) {
+                    irmaoEsq.chaves[irmaoEsq.chavesTotais()] = noAtual->chaves[i];
+                    irmaoEsq.nos[irmaoEsq.chavesTotais()] = noAtual->nos[i];
+                    irmaoEsq.chavesTotais()++;
+                }
+                irmaoEsq.nos[irmaoEsq.chavesTotais()] = noAtual->nos[noAtual->chavesTotais()];
+
+                // Remove a chave e o ponteiro separador no pai
+                for (int i = posNoPai - 1; i < noPai->chavesTotais() - 1; ++i) {
+                    noPai->chaves[i] = noPai->chaves[i + 1];
+                }
+                for (int i = posNoPai; i < noPai->chavesTotais(); ++i) {
+                    noPai->nos[i] = noPai->nos[i + 1];
+                }
+                noPai->chavesTotais()--;
+
+                salvarNoNoDisco(irmaoEsq.rrn, &irmaoEsq);
+                salvarNoNoDisco(noPai->rrn, noPai);
+
+                // noAtual foi esvaziado: seu RRN é reaproveitado na lixeira
+                moverParaLixeira(noAtual->rrn);
+            } else {
+                // Fusão do irmão direito dentro de noAtual
+                int rrnDir = noPai->nos[posNoPai + 1];
+                Node irmaoDir(rrnDir, header.ordem, &file);
+
+                // Chave separadora do pai desce
+                noAtual->chaves[noAtual->chavesTotais()] = noPai->chaves[posNoPai];
+                noAtual->chavesTotais()++;
+
+                // Copia chaves e ponteiros do irmão direito
+                for (int i = 0; i < irmaoDir.chavesTotais(); ++i) {
+                    noAtual->chaves[noAtual->chavesTotais()] = irmaoDir.chaves[i];
+                    noAtual->nos[noAtual->chavesTotais()] = irmaoDir.nos[i];
+                    noAtual->chavesTotais()++;
+                }
+                noAtual->nos[noAtual->chavesTotais()] = irmaoDir.nos[irmaoDir.chavesTotais()];
+
+                // Remove a chave e o ponteiro separador no pai
+                for (int i = posNoPai; i < noPai->chavesTotais() - 1; ++i) {
+                    noPai->chaves[i] = noPai->chaves[i + 1];
+                }
+                for (int i = posNoPai + 1; i < noPai->chavesTotais(); ++i) {
+                    noPai->nos[i] = noPai->nos[i + 1];
+                }
+                noPai->chavesTotais()--;
+
+                salvarNoNoDisco(noAtual->rrn, noAtual.get());
+                salvarNoNoDisco(noPai->rrn, noPai);
+
+                // irmaoDir foi esvaziado: seu RRN é reaproveitado na lixeira
+                moverParaLixeira(irmaoDir.rrn);
+            }
+
+            // O pai perdeu uma chave, logo o loop continua subindo para rebalancear o pai se necessário
+        }
+
+        return true;
+    }
 
 private:
-  //Gerenciar os espaços apagados por aqui. Dps vou implementar.
-  void reaproveitar() {};
+    header header;
+    fstream file;
 
-  void calcularNodeSize() {
-    // Calcula o tamanho dos nodes em tempo de execução (Requisito Opt 2)
-    //                     header + nodes e chaves + inteiros
-    registroSize = (sizeof(head) + (sizeof(head.quantidadeDeVias) * 2) + 7);
-  };
+    // Grava o buffer contínuo do nó no disco em chamada única
+    void salvarNoNoDisco(int indice, Node* no) {
+        int posicao = sizeof(header) + (indice * header.ordem * 2 * sizeof(int));
+        file.seekp(posicao);
+        file.write(reinterpret_cast<char*>(no->buffer.data()), no->buffer.size() * sizeof(int));
+        file.flush();
+    }
 
-  int headSize = sizeof(struct::head);
-  int registroSize;
-  head head;
-  fstream file;
+    // Obtém RRN da lixeira ou expande o arquivo
+    int obterNovoId() {
+        if (header.pilhaDaLixeira != -1) {
+            int rrnReutilizado = header.pilhaDaLixeira;
+            int posicao = sizeof(header) + (rrnReutilizado * header.ordem * 2 * sizeof(int));
+            file.seekg(posicao);
+
+            int proximoLixo;
+            file.read(reinterpret_cast<char*>(&proximoLixo), sizeof(int));
+            header.pilhaDaLixeira = proximoLixo;
+
+            file.seekp(0);
+            file.write(reinterpret_cast<char*>(&header), sizeof(header));
+            file.flush();
+            return rrnReutilizado;
+        }
+
+        file.seekg(0, ios::end);
+        int tamanhoArquivo = file.tellg();
+        if (tamanhoArquivo == sizeof(header)) {
+            return 0;
+        }
+        return (tamanhoArquivo - sizeof(header)) / (header.ordem * 2 * sizeof(int));
+    }
+
+    // Encadeia nó excluído no topo da pilha da lixeira
+    void moverParaLixeira(int indiceDescartado) {
+        int posicao = sizeof(header) + (indiceDescartado * header.ordem * 2 * sizeof(int));
+        file.seekp(posicao);
+        file.write(reinterpret_cast<char*>(&header.pilhaDaLixeira), sizeof(int));
+
+        header.pilhaDaLixeira = indiceDescartado;
+        file.seekp(0);
+        file.write(reinterpret_cast<char*>(&header), sizeof(header));
+        file.flush();
+    }
 };
