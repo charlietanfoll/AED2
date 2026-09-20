@@ -1,3 +1,6 @@
+// Charlie Tanfoll Pereira Lobo - 16827968
+// Marina Cintra Queiroz - 17074404
+
 #pragma once
 
 #include <fstream>
@@ -56,12 +59,14 @@ public:
         nos = span<int>(buffer.data() + ordem, ordem);
     }
 
+    // Construtor de Movimento
     Node(Node&& other) noexcept : rrn(other.rrn), buffer(std::move(other.buffer)) {
         int ordem = static_cast<int>(buffer.size() / 2);
         chaves = span<int>(buffer.data() + 1, ordem - 1);
         nos = span<int>(buffer.data() + ordem, ordem);
     }
 
+    // Operador de Atribuição por Movimento
     Node& operator=(Node&& other) noexcept {
         if (this != &other) {
             rrn = other.rrn;
@@ -73,7 +78,9 @@ public:
         return *this;
     }
 
+    // Construtor de Cópia Deletado
     Node(const Node&) = delete;
+    // Operador de Atribuição por Cópia Deletado
     Node& operator=(const Node&) = delete;
 
     int& chavesTotais() { return buffer[0]; }
