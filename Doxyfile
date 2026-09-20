@@ -21,7 +21,7 @@ HIDE_UNDOC_CLASSES     = NO
 JAVADOC_AUTOBRIEF      = YES
 
 # Arquivos de Entrada e Varredura
-INPUT                  = . .charlie Trabalho
+INPUT                  = .
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \
                          *.cc \
@@ -36,6 +36,7 @@ FILE_PATTERNS          = *.c \
                          *.h++ \
                          *.md
 RECURSIVE              = YES
+
 EXCLUDE_PATTERNS       = */cmake-build-*/* \
                          */.idea/*
 
