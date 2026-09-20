@@ -54,6 +54,26 @@ public:
         nos = span<int>(buffer.data() + ordem, ordem);
     }
 
+    Node(Node&& other) noexcept : rrn(other.rrn), buffer(std::move(other.buffer)) {
+        int ordem = static_cast<int>(buffer.size() / 2);
+        chaves = span<int>(buffer.data() + 1, ordem - 1);
+        nos = span<int>(buffer.data() + ordem, ordem);
+    }
+
+    Node& operator=(Node&& other) noexcept {
+        if (this != &other) {
+            rrn = other.rrn;
+            buffer = std::move(other.buffer);
+            int ordem = static_cast<int>(buffer.size() / 2);
+            chaves = span<int>(buffer.data() + 1, ordem - 1);
+            nos = span<int>(buffer.data() + ordem, ordem);
+        }
+        return *this;
+    }
+
+    Node(const Node&) = delete;
+    Node& operator=(const Node&) = delete;
+
     int& chavesTotais() { return buffer[0]; }
     const int& chavesTotais() const { return buffer[0]; }
 
@@ -65,8 +85,8 @@ public:
 
 class Btree {
 public:
-    Btree(string alias, int ordem = 10) {
-        if (!filesystem::exists(alias)) {
+    Btree(const string& alias, int ordem = 10) {
+        if (!filesystem::exists(alias) || filesystem::file_size(alias) < sizeof(struct header)) {
             file.open(alias, ios::out | ios::in | ios::binary | ios::trunc);
             header.root = -1;
             header.ordem = ordem;

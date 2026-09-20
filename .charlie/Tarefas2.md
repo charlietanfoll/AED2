@@ -1,4 +1,4 @@
-# Tarefas - Trabalho 1: Árvore B (AED II)
+# Tarefas - Trabalho 1: Árvore B (AED II) (Versão 2)
 
 ## Status Geral do Projeto
 - **Árvore B (Núcleo Algorítmico):** ~85% implementada em `Arvoreb.cppm` (busca iterativa com pilha, inserção com split, remoção com redistribuição/fusão e coleta de lixo).
